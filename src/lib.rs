@@ -1,6 +1,7 @@
 use godot::prelude::*;
 
-mod matrix;
+mod mdata;
+mod mat;
 
 struct NumGDExtension;
 
