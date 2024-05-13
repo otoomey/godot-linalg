@@ -10,3 +10,4 @@ crate-type = ["cdylib"]  # Compile this crate to a dynamic C library.
 godot = { git = "https://github.com/godot-rust/gdext", branch = "master" }
 nalgebra = "0.32.5"
 strum_macros = "0.26.2"
+rand = "0.8.5"

@@ -1,5 +1,6 @@
 use godot::prelude::*;
-use nalgebra::{Complex, DMatrix};
+use nalgebra::{Complex, DMatrix, Matrix};
+use rand::{distributions::Uniform, Rng};
 use strum_macros::AsRefStr;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -86,6 +87,22 @@ impl IRefCounted for Mat {
 
 #[godot_api]
 impl Mat {
+    #[func]
+    fn rand(nrows: i64, ncols: i64) -> Option<Gd<Self>> {
+        if let Err(err) = check_dim(nrows, ncols) {
+            godot_script_error!("{}", err);
+            return None
+        }
+        let range = Uniform::new(0.0, 1.0);
+        let data = rand::thread_rng().sample_iter(&range).take((nrows*ncols) as usize).collect();
+        Some(Gd::from_init_fn(|base| {
+            Self {
+                m: MType::F64(DMatrix::from_vec(nrows as usize, ncols as usize, data)),
+                base,
+            }
+        }))
+    }
+
     #[func]
     fn from_array(nrows: i64, ncols: i64, data: Variant) -> Option<Gd<Self>> {
         if let Err(err) = check_dim(nrows, ncols) {
@@ -415,35 +432,7 @@ impl Mat {
     #[func]
     fn add(&self, other: Gd<Mat>) -> Option<Gd<Self>> {
         let m = &other.bind().m;
-        match (m, &self.m) {
-            (MType::U8(a), MType::U8(b)) => {
-                Some(MType::U8(a + b))
-            },
-            (MType::I32(a), MType::I32(b)) => {
-                Some(MType::I32(a + b))
-            },
-            (MType::I64(a), MType::I64(b)) => {
-                Some(MType::I64(a + b))
-            },
-            (MType::F32(a), MType::F32(b)) => {
-                Some(MType::F32(a + b))
-            },
-            (MType::F64(a), MType::F64(b)) => {
-                Some(MType::F64(a + b))
-            },
-            (MType::C64(a), MType::C64(b)) => {
-                Some(MType::C64(a + b))
-            },
-            (MType::C128(a), MType::C128(b)) => {
-                Some(MType::C128(a + b))
-            },
-            _ => {
-                godot_script_error!("Unsupported operand types: {} + {}.", 
-                self.m.as_ref(), 
-                m.as_ref());
-                return None
-            }
-        }.map(|m| Gd::from_init_fn(|base|
+        self.m.add(m).map(|m| Gd::from_init_fn(|base|
             Self {
                 m,
                 base,
@@ -454,35 +443,7 @@ impl Mat {
     #[func]
     fn mul(&self, other: Gd<Mat>) -> Option<Gd<Self>> {
         let m = &other.bind().m;
-        match (&self.m, m) {
-            (MType::U8(a), MType::U8(b)) => {
-                Some(MType::U8(a.component_mul(b)))
-            },
-            (MType::I32(a), MType::I32(b)) => {
-                Some(MType::I32(a.component_mul(b)))
-            },
-            (MType::I64(a), MType::I64(b)) => {
-                Some(MType::I64(a.component_mul(b)))
-            },
-            (MType::F32(a), MType::F32(b)) => {
-                Some(MType::F32(a.component_mul(b)))
-            },
-            (MType::F64(a), MType::F64(b)) => {
-                Some(MType::F64(a.component_mul(b)))
-            },
-            (MType::C64(a), MType::C64(b)) => {
-                Some(MType::C64(a.component_mul(b)))
-            },
-            (MType::C128(a), MType::C128(b)) => {
-                Some(MType::C128(a.component_mul(b)))
-            },
-            _ => {
-                godot_script_error!("Unsupported operand types: {} + {}.", 
-                self.m.as_ref(), 
-                m.as_ref());
-                return None
-            }
-        }.map(|m| Gd::from_init_fn(|base|
+        self.m.mul(m).map(|m| Gd::from_init_fn(|base|
             Self {
                 m,
                 base,
@@ -493,35 +454,7 @@ impl Mat {
     #[func]
     fn mm(&self, other: Gd<Mat>) -> Option<Gd<Self>> {
         let m = &other.bind().m;
-        match (&self.m, m) {
-            (MType::U8(a), MType::U8(b)) => {
-                Some(MType::U8(a * b))
-            },
-            (MType::I32(a), MType::I32(b)) => {
-                Some(MType::I32(a * b))
-            },
-            (MType::I64(a), MType::I64(b)) => {
-                Some(MType::I64(a * b))
-            },
-            (MType::F32(a), MType::F32(b)) => {
-                Some(MType::F32(a * b))
-            },
-            (MType::F64(a), MType::F64(b)) => {
-                Some(MType::F64(a * b))
-            },
-            (MType::C64(a), MType::C64(b)) => {
-                Some(MType::C64(a * b))
-            },
-            (MType::C128(a), MType::C128(b)) => {
-                Some(MType::C128(a * b))
-            },
-            _ => {
-                godot_script_error!("Unsupported operand types: {} + {}.", 
-                self.m.as_ref(), 
-                m.as_ref());
-                return None
-            }
-        }.map(|m| Gd::from_init_fn(|base|
+        self.m.mm(m).map(|m| Gd::from_init_fn(|base|
             Self {
                 m,
                 base,
@@ -532,40 +465,62 @@ impl Mat {
     #[func]
     fn kron(&self, other: Gd<Mat>) -> Option<Gd<Self>> {
         let m = &other.bind().m;
-        match (&self.m, m) {
-            (MType::U8(a), MType::U8(b)) => {
-                Some(MType::U8(a.kronecker(b)))
-            },
-            (MType::I32(a), MType::I32(b)) => {
-                Some(MType::I32(a.kronecker(b)))
-            },
-            (MType::I64(a), MType::I64(b)) => {
-                Some(MType::I64(a.kronecker(b)))
-            },
-            (MType::F32(a), MType::F32(b)) => {
-                Some(MType::F32(a.kronecker(b)))
-            },
-            (MType::F64(a), MType::F64(b)) => {
-                Some(MType::F64(a.kronecker(b)))
-            },
-            (MType::C64(a), MType::C64(b)) => {
-                Some(MType::C64(a.kronecker(b)))
-            },
-            (MType::C128(a), MType::C128(b)) => {
-                Some(MType::C128(a.kronecker(b)))
-            },
-            _ => {
-                godot_script_error!("Unsupported operand types: {} o {}.", 
-                self.m.as_ref(), 
-                m.as_ref());
-                return None
-            }
-        }.map(|m| Gd::from_init_fn(|base|
+        self.m.kron(m).map(|m| Gd::from_init_fn(|base|
             Self {
                 m,
                 base,
             }
         ))
+    }
+
+    #[func]
+    fn lt(&self, other: Gd<Mat>) -> Option<Gd<Self>> {
+        let m = &other.bind().m;
+        self.m.lt(m).map(|m| Gd::from_init_fn(|base|
+            Self { m, base, }
+        ))
+    }
+
+    #[func]
+    fn le(&self, other: Gd<Mat>) -> Option<Gd<Self>> {
+        let m = &other.bind().m;
+        self.m.le(m).map(|m| Gd::from_init_fn(|base|
+            Self { m, base, }
+        ))
+    }
+
+    #[func]
+    fn eq(&self, other: Gd<Mat>) -> Option<Gd<Self>> {
+        let m = &other.bind().m;
+        self.m.eq(m).map(|m| Gd::from_init_fn(|base|
+            Self { m, base, }
+        ))
+    }
+
+    #[func]
+    fn ge(&self, other: Gd<Mat>) -> Option<Gd<Self>> {
+        let m = &other.bind().m;
+        self.m.ge(m).map(|m| Gd::from_init_fn(|base|
+            Self { m, base, }
+        ))
+    }
+
+    #[func]
+    fn gt(&self, other: Gd<Mat>) -> Option<Gd<Self>> {
+        let m = &other.bind().m;
+        self.m.gt(m).map(|m| Gd::from_init_fn(|base|
+            Self { m, base, }
+        ))
+    }
+
+    #[func]
+    fn all(&self) -> bool {
+        self.m.all()
+    }
+
+    #[func]
+    fn any(&self) -> bool {
+        self.m.any()
     }
 
     #[func]
@@ -922,6 +877,296 @@ impl MType {
         match self {
             MType::View { view_type, .. } => *view_type,
             _ => ViewType::All
+        }
+    }
+
+    fn any(&self) -> bool {
+        match self {
+            MType::Bool(m) => m.iter().any(|x| *x),
+            MType::U8(m) => m.iter().any(|x| *x == 1),
+            MType::I32(m) => m.iter().any(|x| *x == 1),
+            MType::I64(m) => m.iter().any(|x| *x == 1),
+            MType::F32(m) => m.iter().any(|x| *x == 1.0),
+            MType::F64(m) => m.iter().any(|x| *x == 1.0),
+            MType::View { mat, start, shape, view_type } => {
+                mat.bind().m.slice(*start, *shape, *view_type).any()
+            },
+            _ => false
+        }
+    }
+
+    fn all(&self) -> bool {
+        match self {
+            MType::Bool(m) => m.iter().all(|x| *x),
+            MType::U8(m) => m.iter().all(|x| *x == 1),
+            MType::I32(m) => m.iter().all(|x| *x == 1),
+            MType::I64(m) => m.iter().all(|x| *x == 1),
+            MType::F32(m) => m.iter().all(|x| *x == 1.0),
+            MType::F64(m) => m.iter().all(|x| *x == 1.0),
+            MType::View { mat, start, shape, view_type } => {
+                mat.bind().m.slice(*start, *shape, *view_type).all()
+            },
+            _ => false
+        }
+    }
+
+    fn kron(&self, other: &MType) -> Option<Self> {
+        match (&self, other) {
+            (MType::U8(a), MType::U8(b)) => {
+                Some(MType::U8(a.kronecker(b)))
+            },
+            (MType::I32(a), MType::I32(b)) => {
+                Some(MType::I32(a.kronecker(b)))
+            },
+            (MType::I64(a), MType::I64(b)) => {
+                Some(MType::I64(a.kronecker(b)))
+            },
+            (MType::F32(a), MType::F32(b)) => {
+                Some(MType::F32(a.kronecker(b)))
+            },
+            (MType::F64(a), MType::F64(b)) => {
+                Some(MType::F64(a.kronecker(b)))
+            },
+            (MType::C64(a), MType::C64(b)) => {
+                Some(MType::C64(a.kronecker(b)))
+            },
+            (MType::C128(a), MType::C128(b)) => {
+                Some(MType::C128(a.kronecker(b)))
+            },
+            _ => {
+                godot_script_error!("Unsupported operand types: {} o {}.", 
+                    self.as_ref(), other.as_ref());
+                return None
+            }
+        }
+    }
+
+    fn mm(&self, other: &MType) -> Option<Self> {
+        match (&self, other) {
+            (MType::U8(a), MType::U8(b)) => {
+                Some(MType::U8(a * b))
+            },
+            (MType::I32(a), MType::I32(b)) => {
+                Some(MType::I32(a * b))
+            },
+            (MType::I64(a), MType::I64(b)) => {
+                Some(MType::I64(a * b))
+            },
+            (MType::F32(a), MType::F32(b)) => {
+                Some(MType::F32(a * b))
+            },
+            (MType::F64(a), MType::F64(b)) => {
+                Some(MType::F64(a * b))
+            },
+            (MType::C64(a), MType::C64(b)) => {
+                Some(MType::C64(a * b))
+            },
+            (MType::C128(a), MType::C128(b)) => {
+                Some(MType::C128(a * b))
+            },
+            _ => {
+                godot_script_error!("Unsupported operand types: {} + {}.", 
+                    self.as_ref(), other.as_ref());
+                return None
+            }
+        }
+    } 
+
+    fn mul(&self, other: &MType) -> Option<Self> {
+        match (&self, other) {
+            (MType::U8(a), MType::U8(b)) => {
+                Some(MType::U8(a.component_mul(b)))
+            },
+            (MType::I32(a), MType::I32(b)) => {
+                Some(MType::I32(a.component_mul(b)))
+            },
+            (MType::I64(a), MType::I64(b)) => {
+                Some(MType::I64(a.component_mul(b)))
+            },
+            (MType::F32(a), MType::F32(b)) => {
+                Some(MType::F32(a.component_mul(b)))
+            },
+            (MType::F64(a), MType::F64(b)) => {
+                Some(MType::F64(a.component_mul(b)))
+            },
+            (MType::C64(a), MType::C64(b)) => {
+                Some(MType::C64(a.component_mul(b)))
+            },
+            (MType::C128(a), MType::C128(b)) => {
+                Some(MType::C128(a.component_mul(b)))
+            },
+            _ => {
+                godot_script_error!("Unsupported operand types: {} + {}.", 
+                    self.as_ref(), other.as_ref());
+                return None
+            }
+        }
+    }
+
+    fn add(&self, other: &MType) -> Option<Self> {
+        match (&self, other) {
+            (MType::U8(a), MType::U8(b)) => {
+                Some(MType::U8(a + b))
+            },
+            (MType::I32(a), MType::I32(b)) => {
+                Some(MType::I32(a + b))
+            },
+            (MType::I64(a), MType::I64(b)) => {
+                Some(MType::I64(a + b))
+            },
+            (MType::F32(a), MType::F32(b)) => {
+                Some(MType::F32(a + b))
+            },
+            (MType::F64(a), MType::F64(b)) => {
+                Some(MType::F64(a + b))
+            },
+            (MType::C64(a), MType::C64(b)) => {
+                Some(MType::C64(a + b))
+            },
+            (MType::C128(a), MType::C128(b)) => {
+                Some(MType::C128(a + b))
+            },
+            _ => {
+                godot_script_error!("Unsupported operand types: {} + {}.", 
+                self.as_ref(), 
+                other.as_ref());
+                return None
+            }
+        }
+    }
+
+    fn lt(&self, other: &MType) -> Option<Self> {
+        match (&self, other) {
+            (MType::U8(a), MType::U8(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a < b)))
+            },
+            (MType::I32(a), MType::I32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a < b)))
+            },
+            (MType::I64(a), MType::I64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a < b)))
+            },
+            (MType::F32(a), MType::F32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a < b)))
+            },
+            (MType::F64(a), MType::F64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a < b)))
+            }
+            _ => {
+                godot_script_error!("Unsupported operand types: {} < {}.", 
+                    self.as_ref(), other.as_ref());
+                return None
+            }
+        }
+    }
+
+    fn le(&self, other: &MType) -> Option<Self> {
+        match (&self, other) {
+            (MType::U8(a), MType::U8(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a <= b)))
+            },
+            (MType::I32(a), MType::I32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a <= b)))
+            },
+            (MType::I64(a), MType::I64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a <= b)))
+            },
+            (MType::F32(a), MType::F32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a <= b)))
+            },
+            (MType::F64(a), MType::F64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a <= b)))
+            }
+            _ => {
+                godot_script_error!("Unsupported operand types: {} <= {}.", 
+                self.as_ref(), 
+                other.as_ref());
+                return None
+            }
+        }
+    }
+
+    fn eq(&self, other: &MType) -> Option<Self> {
+        match (&self, other) {
+            (MType::U8(a), MType::U8(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a == b)))
+            },
+            (MType::I32(a), MType::I32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a == b)))
+            },
+            (MType::I64(a), MType::I64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a == b)))
+            },
+            (MType::F32(a), MType::F32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a.eq(&b))))
+            },
+            (MType::F64(a), MType::F64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a.eq(&b))))
+            }
+            (MType::C64(a), MType::C64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a.eq(&b))))
+            }
+            (MType::C128(a), MType::C128(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a.eq(&b))))
+            }
+            _ => {
+                godot_script_error!("Unsupported operand types: {} == {}.", 
+                self.as_ref(), 
+                other.as_ref());
+                return None
+            }
+        }
+    }
+
+    fn ge(&self, other: &MType) -> Option<Self> {
+        match (&self, other) {
+            (MType::U8(a), MType::U8(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a >= b)))
+            },
+            (MType::I32(a), MType::I32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a >= b)))
+            },
+            (MType::I64(a), MType::I64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a >= b)))
+            },
+            (MType::F32(a), MType::F32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a >= b)))
+            },
+            (MType::F64(a), MType::F64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a >= b)))
+            }
+            _ => {
+                godot_script_error!("Unsupported operand types: {} >= {}.", 
+                self.as_ref(), 
+                other.as_ref());
+                return None
+            }
+        }
+    }
+
+    fn gt(&self, other: &MType) -> Option<Self> {
+        match (&self, other) {
+            (MType::U8(a), MType::U8(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a > b)))
+            },
+            (MType::I32(a), MType::I32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a > b)))
+            },
+            (MType::I64(a), MType::I64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a > b)))
+            },
+            (MType::F32(a), MType::F32(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a > b)))
+            },
+            (MType::F64(a), MType::F64(b)) => {
+                Some(MType::Bool(a.zip_map(b, |a, b| a > b)))
+            }
+            _ => {
+                godot_script_error!("Unsupported operand types: {} > {}.", 
+                self.as_ref(), 
+                other.as_ref());
+                return None
+            }
         }
     }
 
