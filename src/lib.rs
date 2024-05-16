@@ -2,6 +2,7 @@ use godot::prelude::*;
 
 mod mdata;
 mod mat;
+mod view;
 
 struct NumGDExtension;
 
